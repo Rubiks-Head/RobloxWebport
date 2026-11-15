@@ -1,0 +1,116 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>webport</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; display: grid; place-items: center;
+    background: #0b0d10; color: #e6e8eb;
+    font: 15px/1.5 ui-monospace, 'Cascadia Code', Consolas, monospace;
+  }
+  main { width: min(400px, 92vw); }
+  h1 { font-size: 22px; font-weight: 600; margin: 0 0 4px; letter-spacing: .5px; }
+  .sub { color: #8b9199; font-size: 13px; margin-bottom: 24px; }
+  label { display: block; font-size: 12px; color: #8b9199; margin: 14px 0 5px; }
+  input, select {
+    width: 100%; padding: 10px 12px; border-radius: 8px;
+    border: 1px solid #2a2f36; background: #14171b; color: inherit;
+    font: inherit; outline: none;
+  }
+  input:focus, select:focus { border-color: #4f7cff; }
+  button {
+    width: 100%; margin-top: 20px; padding: 12px; border: 0; border-radius: 8px;
+    background: #4f7cff; color: #fff; font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: #5f87ff; }
+  button:disabled { opacity: .45; cursor: default; }
+  .err { color: #ff7b72; font-size: 13px; min-height: 18px; margin-top: 10px; }
+  .resume {
+    display: none; margin-bottom: 20px; padding: 14px;
+    border: 1px solid #2a2f36; border-radius: 8px; background: #14171b;
+  }
+  .resume .sid { color: #8b9199; font-size: 12px; }
+  .resume button { margin-top: 10px; background: #21262d; }
+  .resume button:hover { background: #2a3038; }
+  .or { text-align: center; color: #565c64; font-size: 12px; margin: 14px 0 0; display: none; }
+</style>
+<main>
+  <h1>webport</h1>
+  <div class="sub">roblox in the browser</div>
+
+  <div class="resume" id="resume">
+    <div>active session</div>
+    <div class="sid" id="resume-sid"></div>
+    <button id="resume-btn">resume</button>
+  </div>
+  <div class="or" id="or">— or new —</div>
+
+  <form id="f">
+    <label for="place">place id</label>
+    <input id="place" inputmode="numeric" placeholder="1818" autocomplete="off" required>
+
+    <label for="token" id="token-label">.ROBLOSECURITY</label>
+    <input id="token" type="password" autocomplete="off" spellcheck="false">
+
+    <label for="method">join method</label>
+    <select id="method">
+      <option value="">auto</option>
+      <option value="web">web</option>
+      <option value="desktop">desktop</option>
+    </select>
+
+    <button id="go" type="submit">play</button>
+  </form>
+  <div class="err" id="err"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const place = $('place'), token = $('token'), err = $('err');
+
+place.value = localStorage.getItem('rh_place') || '';
+
+// session state — resume card + whether the server already holds a token
+let def = { defaultToken: false };
+try {
+  const r = await fetch('/pg', { credentials: 'include' });
+  def = await r.json();
+  if (def && def.sid) {
+    $('resume').style.display = 'block';
+    $('or').style.display = 'block';
+    $('resume-sid').textContent = def.sid + (def.placeId ? ` · place ${def.placeId}` : '');
+    $('resume-btn').onclick = () => location.href = def.url;
+  }
+} catch {}
+$('token-label').textContent =
+  '.ROBLOSECURITY' + (def.defaultToken ? ' (blank = server default)' : '');
+if (!def.defaultToken) token.required = true;
+
+$('f').onsubmit = async e => {
+  e.preventDefault();
+  err.textContent = '';
+  const gid = +place.value;
+  if (!gid) { err.textContent = 'place id required'; return; }
+  $('go').disabled = true;
+  localStorage.setItem('rh_place', place.value);
+  try {
+    const r = await fetch('/pg', {
+      method: 'POST', credentials: 'include',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        placeId: gid,
+        token: token.value || undefined,
+        joinMethod: $('method').value || undefined,
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok || !j.url) throw new Error(j.error || `server ${r.status}`);
+    location.href = j.url;
+  } catch (x) {
+    err.textContent = x.message;
+    $('go').disabled = false;
+  }
+};
+</script>

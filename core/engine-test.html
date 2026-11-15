@@ -1,0 +1,149 @@
+<!doctype html>
+<!-- engine-test — drive WebClient.wasm directly with a recorded joinScript +
+     engine.json (abi layout). The socket pump rides the same-origin
+     /udp-relay (MSG_* mode). Fetches engine.json + join.json out of
+     /webclient — drop them into core/staging to use. -->
+<html><head><meta charset="utf-8"><title>engine test</title>
+<style>body{background:#111;color:#eee;font:12px monospace;margin:0}#log{height:100vh;overflow:auto;padding:10px;white-space:pre-wrap}</style>
+</head><body>
+<div id="log"></div>
+<canvas id="canvas" width="800" height="600" style="display:none"></canvas>
+<script type="module">
+  const L = (...a) => { const el = document.getElementById('log'); el.textContent += a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ') + '\n'; el.scrollTop = el.scrollHeight; console.log(...a); };
+  const W = '/webclient';
+  L('crossOriginIsolated:', self.crossOriginIsolated);
+  for (const n of ['__onEngineLoadingStatus','__onDefaultLoadingScreenRemoved','__onExperienceJoined','__onExperienceLeft','__rbxGenericChallengeListenerInstalled','__rbxLinkingPrompt','__rbxTabPrompt','__rbxWebViewTabState','__resolveGameExit','__onGameReady','__onConnectionFailed','__onGameLeave'])
+    if (!window[n]) window[n] = (...a) => L(`[cb ${n}]`, ...a.map(x => (x && typeof x === 'object' ? JSON.stringify(x) : String(x)).slice(0, 220)));
+  window.saveIxpSettings = window.saveIxpSettings || ((...a) => {});
+  window.loadIxpSettings = window.loadIxpSettings || (() => '');
+
+  const [ej, js, drv, assetMeta, contentMeta] = await Promise.all([
+    fetch(`${W}/engine.json`).then(r => r.json()),
+    fetch(`${W}/join.json`).then(r => r.json()),
+    import(`${W}/driver.js`),
+    fetch(`${W}/WebClient.metadata.json`).then(r => r.json()).catch(() => []),
+    fetch(`${W}/content-metadata.json`).then(r => r.json()).catch(() => []),
+  ]);
+  L('engine.json upload:', ej.upload, 'abi.base:', '0x' + ej.abi.base.toString(16));
+  const joinScript = js.joinScript || js;
+  L('joinScript udmux:', joinScript.UdmuxEndpoints?.[0], 'netstack:', joinScript.NetStackPort);
+  // tell the server about this session so /udmux + relay default resolve
+  fetch('/session').then(r => r.json()).then(s => L('server session:', s)).catch(() => {});
+
+  const mem = new WebAssembly.Memory({ initial: 40000, maximum: 65536, shared: true });
+  L('shared mem pages:', mem.buffer.byteLength / 65536);
+  const canvas = document.getElementById('canvas');
+  canvas.style.display = 'block';
+  const hostInfo = {
+    hostOS: 1, osName: 'Windows', osVersion: '10.0', deviceModel: '',
+    browserName: 'Chrome', browserVersion: '142.0.0.0', mobile: false,
+    screenWidthDip: 1920, screenHeightDip: 1080, screenWidthPx: 1920, screenHeightPx: 1080, dpi: 96,
+    gpuVendor: 'NVIDIA', gpuRenderer: 'NVIDIA GeForce RTX', memoryMB: 16384, cpuLogicalCount: 8,
+  };
+  window.Module = {
+    wasmMemory: mem, canvas, hostInfo,
+    locateFile: p => `${W}/` + p,
+    mainScriptUrlOrBlob: `${W}/WebClient.js`,
+    audioProcessorUrl: `${W}/audio-processor-fast.js`,
+    encoder: new TextEncoder(), decoder: new TextDecoder(), fontMap: {},
+    noInitialRun: true,
+    robloxBaseUrl: 'www.' + location.host,
+    websiteBaseUrl: location.origin,
+    authCookie: 'local-dev',
+    accountLocales: JSON.stringify({ robloxLocale: 'en_us', gameLocale: 'en_us' }),
+    flags: JSON.stringify(window.__flagsJson || {}),
+    enableProxy: true, placeId: 1818,
+    assetMetadata: JSON.stringify({}), channel: '',
+    browserTrackerId: '1792443431637001',
+    saveIxpSettings: (...a) => L('[cb saveIxpSettings]', JSON.stringify(a).slice(0, 100)),
+    loadIxpSettings: () => '',
+    seal: ej.seal, sha256: ej.sha256, upload: ej.upload, token: ej.token,
+    gate: ej.gate, patch: ej.patch, signature: ej.signature,
+    engineJson: JSON.stringify(ej),
+    joinScriptData: JSON.stringify(js),
+    preInit: [], preRun: [], logReadFiles: true, totalDependencies: 0,
+    monitorRunDependencies: n => { window.Module.totalDependencies = Math.max(window.Module.totalDependencies, n); L('deps:', n); },
+    setStatus: s => { if (s !== (window.Module.setStatus.last || {}).text) { window.Module.setStatus.last = { time: Date.now(), text: s }; L('[status]', s); } },
+    print: (...a) => L('[eng]', a.join(' ')),
+    printErr: s => L('[eng-err]', s),
+    reportEngineError: e => L('[REPORT]', typeof e === 'object' ? JSON.stringify(e).slice(0, 600) : String(e)),
+    reportCrash: e => L('[CRASH]', typeof e === 'object' ? JSON.stringify(e).slice(0, 600) : String(e)),
+    setCrashAttribute: (k, v) => L(`[crash-attr] ${k}=${String(v).slice(0, 200)}`),
+    onAbort: w => L('[ABORT]', String(w).slice(0, 300)),
+    getEffectiveDevicePixelRatio: () => Math.min(window.devicePixelRatio || 1, 2),
+    isMobileDevice: () => false, applyPendingResize: () => false, arguments: [],
+    onRuntimeInitialized: function () {
+      L('*** RUNTIME INITIALIZED — feeding session ***');
+      const M = window.Module;
+      const cw = (n, ret, sig) => { try { return M.cwrap(n, ret, sig); } catch (e) { L(`cwrap ${n} missing: ${e.message}`); return () => {}; } };
+      try {
+        const reg = cw('rbx_fs_register_asset', 'number', ['string', 'number']);
+        const addf = cw('rbx_fs_add_file', 'number', ['string', 'array', 'number']);
+        cw('rbx_fs_set_base_url', null, ['string'])(location.origin + W);
+        let regN = 0;
+        for (const a of assetMeta) { reg(a.path, a.size); regN++; }
+        for (const a of contentMeta) { reg(a.path, a.size); regN++; }
+        L(`registered ${regN} assets (${assetMeta.length} meta + ${contentMeta.length} /content)`);
+        try { const ixp = localStorage.getItem('rbxIxpSettings.v1'); if (ixp && M.set_cached_ixp_settings) M.set_cached_ixp_settings(ixp); } catch (_) {}
+        if (M.set_roblox_base_url) M.set_roblox_base_url('https://www.' + location.host + '/');
+        if (M.set_channel) M.set_channel('production');
+        if (M.set_pretend_platform) M.set_pretend_platform('desktop');
+        if (M.set_preloaded_flags) M.set_preloaded_flags(JSON.stringify({ applicationSettings: { BaseUrl: 'https://www.' + location.host + '/' } }));
+        if (M.set_account_locales) M.set_account_locales(String(joinScript.RobloxLocaleId || ''), String(joinScript.GameLocaleId || ''));
+        if (M.set_place_id) { M.set_place_id(1818); L('set_place_id(1818)'); }
+        if (M.set_browser_tracker_id) M.set_browser_tracker_id('1792443431637001');
+        L('session config fed');
+      } catch (e) { L('init feed err: ' + (e && e.stack || e)); }
+      try {
+        if (M.callMain) { M.callMain(window.Module.arguments || []); L('callMain fired'); }
+        else if (M.run) { M.run(); L('run fired'); }
+        else L('no callMain/run');
+      } catch (e) { L('callMain err: ' + (e && e.stack || e)); }
+    },
+    instantiateWasm: (imports, cb) => {
+      L('instantiateWasm hook');
+      for (const [mod, fns] of Object.entries(imports))
+        for (const [name, fn] of Object.entries(fns)) {
+          if (typeof fn !== 'function') continue;
+          const tag = `${mod}.${name}`;
+          fns[name] = (orig => (...a) => {
+            try {
+              const r = orig(...a);
+              if (r instanceof Promise) return r.catch(e => { L(`[imp-throw] ${tag}`, String(e).slice(0, 200)); throw e; });
+              return r;
+            } catch (e) { L(`[imp-throw] ${tag}`, String(e).slice(0, 200)); throw e; }
+          })(fn);
+        }
+      window.addEventListener('unhandledrejection', e => L('[unhandled]', String(e.reason && e.reason.stack || e.reason).slice(0, 400)));
+      return (async () => {
+        const buf = await fetch(`${W}/WebClient.wasm`).then(r => r.arrayBuffer());
+        const module = await WebAssembly.compile(buf);
+        const inst = await WebAssembly.instantiate(module, imports);
+        L('wasm instantiated — exports:', Object.keys(inst.exports).length);
+        window.__mem = mem;
+        drv.startSocketPump({
+          memory: mem, abi: ej.abi,
+          gate: ej.gate && ej.gate.abi, gateToken: ej.gate && ej.gate.token,
+          joinScript: () => joinScript,
+          trace: s => L('[pump]', s),
+        });
+        setTimeout(() => cb(inst, module), 0);
+        return { instance: inst, module };
+      })();
+    },
+  };
+  const s = document.createElement('script');
+  s.src = `${W}/WebClient.js`;
+  s.onload = async () => {
+    L('glue loaded — calling createWebClient');
+    try {
+      const wc = createWebClient(window.Module);
+      if (wc && wc.then) wc.then(() => L('createWebClient resolved')).catch(e => L('createWebClient err: ' + (e && e.message || e)));
+      L('createWebClient invoked, typeof:', typeof wc);
+    } catch (e) { L('createWebClient threw: ' + (e && e.stack || e)); }
+  };
+  s.onerror = e => L('glue load failed', e);
+  document.head.appendChild(s);
+  L('loading glue…');
+</script>
+</body></html>

@@ -1,0 +1,19 @@
+{
+  "port": 9989,
+  "autoInjectServerSideAuth": true,
+  "robloxAuthToken": "<.ROBLOSECURITY cookie value>",
+  "joinMethod": "auto",
+  "webUserAgent": "Roblox/Web Windows",
+  "upstream": {
+    "domain": "roblox.com",
+    "cdn": "rbxcdn.com",
+    "infra": "rbxinfra.com",
+    "labs": "robloxlabs.com",
+    "extra": ["rbxcdn.net"]
+  },
+  "warpProxies": [],
+
+  // persistence — empty (or missing) = sqlite at server/data/webport.db.
+  // postgres://user:pass@host/db switches to postgres (needs: npm i pg)
+  "database": ""
+}

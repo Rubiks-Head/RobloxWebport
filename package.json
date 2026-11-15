@@ -1,0 +1,18 @@
+{
+  "name": "roblox-webport",
+  "version": "0.1.0",
+  "description": "Self-hosted Roblox web engine client — real joins over native WebTransport/QUIC",
+  "license": "SEE LICENSE IN LICENSE",
+  "exports": {
+    ".": "./index.mjs"
+  },
+  "scripts": {
+    "start": "node index.mjs",
+    "build": "cd core && node build.mjs",
+    "sync": "node core/sync-staging.mjs",
+    "fetch-engine": "node scripts/fetch-engine.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -1,0 +1,38 @@
+RubiksHead WebPort License
+Copyright (c) 2026 RubiksHead contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, subject to the following conditions:
+
+1. PRIVATE USE — do whatever you want with it. You are responsible for
+   following the terms of service of any service you connect to with it
+   (for example, Roblox's). If their terms don't allow it, that's on you,
+   not on this license.
+
+2. PUBLIC / REDISTRIBUTED USE — you may fork, host, and ship builds of this
+   software, but you may NOT:
+   a) modify the client to add scripting/execution capabilities aimed at
+      exploiting games or other users, or
+   b) include anything that captures, logs, or exfiltrates users'
+      credentials, session tokens, or certificate/key material.
+
+3. ATTRIBUTION — not required, but appreciated. If you ship something built
+   on RubiksHead, a shout-out is the nice thing to do. A working browser
+   Roblox client took a while to figure out and, as of writing, this is the
+   most complete method publicly available.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
+
+This license covers this project's code only. Roblox, the Roblox engine,
+and Roblox game content are property of Roblox Corporation; nothing here
+grants any rights to them. Engine binaries and game assets are fetched by
+the user at runtime and are not distributed with this software.
